@@ -1,0 +1,123 @@
+SHOW USER;
+
+1.create table:-
+
+CREATE TABLE emp_info (
+  emp_id     NUMBER PRIMARY KEY,
+  first_name VARCHAR2(50),
+  last_name  VARCHAR2(50),
+  hire_date  DATE,
+  salary     NUMBER(8,2)
+)
+TABLESPACE USERS
+STORAGE (
+    INITIAL 2K
+    NEXT 3K
+    PCTINCREASE 0
+    MINEXTENTS 1
+    MAXEXTENTS 3
+);
+
+
+2. create invalid procedure(table name invalid)
+
+CREATE OR REPLACE PROCEDURE add_employee(
+  p_emp_id      IN NUMBER,
+  p_first_name  IN VARCHAR2,
+  p_last_name   IN VARCHAR2,
+  p_hire_date   IN DATE,
+  p_salary      IN NUMBER
+)
+AS
+BEGIN
+  INSERT INTO employee_info (emp_id, first_name, last_name, hire_date, salary)
+  VALUES (p_emp_id, p_first_name, p_last_name, p_hire_date, p_salary);
+END;
+/
+
+Warning: Procedure created with compilation errors.
+
+-------------------
+3.Show all INVALID objects in your schema
+SELECT object_name, object_type, status
+FROM user_objects
+WHERE status = 'INVALID';
+
+in this invalid procedure add_employee
+----------------------------
+4. Show compilation errors
+
+SHOW ERRORS PROCEDURE ADD_EMPLOYEE;
+
+LINE/COL ERROR
+-------- -----------------------------------------------------------------
+11/3     PL/SQL: SQL Statement ignored
+11/15    PL/SQL: ORA-00942: table or view does not exist
+___________________________________________________
+5. Show the procedure source 
+SELECT line, text
+FROM user_source
+WHERE name = 'ADD_EMPLOYEE'
+ORDER BY line;
+-----------------------------------------------------
+6.recompile using DBMS_DDL package:-
+
+BEGIN
+  DBMS_DDL.ALTER_COMPILE('PROCEDURE', 'MCA11', 'ADD_EMPLOYEE');
+END;
+/
+----------------------------------------------
+
+7.check object status (invalid )because table is missing:-
+
+SELECT object_name, object_type, status
+FROM user_objects
+WHERE object_name = 'ADD_EMPLOYEE';
+
+OBJECT_TYPE             STATUS
+----------------------- -------
+ADD_EMPLOYEE
+PROCEDURE               INVALID
+
+------------------------------------------------------------------------
+8.create missing table employee_info copy of emp_info
+CREATE TABLE employee_info AS SELECT * FROM emp_info WHERE 1=2;
+this is empty table..
+
+DESC employee_info;
+
+10.recompile
+
+BEGIN
+  DBMS_DDL.ALTER_COMPILE('PROCEDURE', 'MCA11', 'ADD_EMPLOYEE');
+END;
+/
+
+11.verify procedure status:-(valid)
+
+SELECT object_name, object_type, status
+FROM user_objects
+WHERE object_name = 'ADD_EMPLOYEE';
+
+OBJECT_NAME
+--------------------------------------------------------------------------------
+OBJECT_TYPE             STATUS
+----------------------- -------
+ADD_EMPLOYEE
+PROCEDURE               VALID
+_
+-------------------------------------------------------
+12.show errors:-
+
+SHOW ERRORS PROCEDURE ADD_EMPLOYEE;
+(no any error)
+
+13.inserted record:-
+
+BEGIN
+  add_employee(1001, 'Urvisha', 'Hirapara', DATE '2025-10-08', 30000);
+  COMMIT;
+END;
+/
+
+SELECT * FROM employee_info WHERE emp_id = 1001;

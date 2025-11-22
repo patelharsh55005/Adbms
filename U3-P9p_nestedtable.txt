@@ -1,0 +1,209 @@
+Customer Orders Example (Nested Table)
+
+ Step 1: Create Object Type
+create or replace type order_obj as object(
+      o_id number,
+      o_item varchar2(20));
+/
+
+Step 2: Create Nested Table Type
+
+create or replace type order_list is table of order_obj;
+/
+
+Type created.
+ Step 3: Create Table with Nested Table
+
+create table customer(
+	c_id number primary key,
+	c_name varchar2(20),
+	orders order_list
+) nested table orders store as orders_tab
+tablespace users;
+
+
+ Step 4: Insert Sample Data
+
+
+COMMIT;
+
+insert into customer values (101,'urvisha',order_list(order_obj(1,'laptop'),order_obj(2,'mouse')));
+insert into customer values (102,'hetvi',order_list(order_obj(1,'phone')));
+commit;
+
+Step 5: Procedure to Insert / Update / Delete Orders
+
+CREATE OR REPLACE PROCEDURE customer_orders(
+   p_cid      IN NUMBER,
+   p_action   IN VARCHAR2,
+   p_position IN NUMBER DEFAULT NULL,
+   p_oid      IN NUMBER DEFAULT NULL,
+   p_oitem    IN VARCHAR2 DEFAULT NULL
+) IS
+   v_orders order_list;
+BEGIN
+   -- Fetch current orders for the customer
+   SELECT orders
+   INTO v_orders
+   FROM customer   
+   WHERE c_id = p_cid
+   FOR UPDATE;
+
+   -- Perform action
+   IF p_action = 'insert' THEN
+      v_orders.EXTEND;
+      v_orders(v_orders.LAST) := order_obj(p_oid, p_oitem);  -- ✅ fixed object name
+
+   ELSIF p_action = 'update' THEN
+      v_orders(p_position) := order_obj(p_oid, p_oitem);
+
+   ELSIF p_action = 'delete' THEN
+      v_orders.DELETE(p_position);
+   END IF;
+
+   -- Save changes
+   UPDATE customer   -- ✅ fixed table name
+      SET orders = v_orders
+    WHERE c_id = p_cid;
+
+   COMMIT;
+END;
+/
+
+EXEC mng_orders(101, 'insert', NULL, 3, 'Keyboard');
+EXEC mng_orders(101, 'UPDATE', 2, 2, 'Wireless Mouse');
+EXEC mng_orders(102, 'DELETE', 1);
+
+Step 7: Check the Data
+
+SELECT c.cust_name, o.order_id, o.order_item
+FROM customers c, TABLE(c.orders) o;
+
+Rahul | 1 | Laptop
+Rahul | 2 | Wireless Mouse
+Rahul | 3 | Keyboard
+Sneha | (no orders after delete)
+
+------------------------------------
+CREATE OR REPLACE PROCEDURE mng_orders(
+   p_cid      IN NUMBER,
+   p_action   IN VARCHAR2,
+   p_position IN NUMBER DEFAULT NULL,  -- here treat as o_id
+   p_oid      IN NUMBER DEFAULT NULL,
+   p_oitem    IN VARCHAR2 DEFAULT NULL
+) IS
+BEGIN
+   IF p_action = 'insert' THEN
+      -- Insert directly into the nested table
+      INSERT INTO TABLE(
+         SELECT c.orders
+         FROM customer c
+         WHERE c.c_id = p_cid
+      ) VALUES (order_obj(p_oid, p_oitem));
+
+   ELSIF p_action = 'update' THEN
+      -- Update directly inside the nested table
+      UPDATE TABLE(
+         SELECT c.orders
+         FROM customer c
+         WHERE c.c_id = p_cid
+      ) o
+      SET o.o_id   = p_oid,
+          o.o_item = p_oitem
+      WHERE o.o_id = p_position;  -- use o_id as key
+
+   ELSIF p_action = 'delete' THEN
+      -- Delete directly from nested table
+      DELETE FROM TABLE(
+         SELECT c.orders
+         FROM customer c
+         WHERE c.c_id = p_cid
+      ) o
+      WHERE o.o_id = p_position;
+   END IF;
+
+   COMMIT;
+END;
+/
+
+
+	
+	
+
+
+___________________________________________________________
+NESTED TABLE:--
+🔹 Step 1: Create Nested Table Type
+-- Nested table type for wishlist
+CREATE OR REPLACE TYPE product_list AS TABLE OF VARCHAR2(50);
+/
+
+-- Customer table with nested table column for wishlist
+CREATE TABLE customers_wishlist (
+    customer_id NUMBER PRIMARY KEY,
+    customer_name VARCHAR2(50),
+    wishlist product_list
+) NESTED TABLE wishlist STORE AS wishlist_storage;
+
+
+🔹 Step 3: Insert Sample Data
+INSERT INTO customers_wishlist VALUES (1, 'Rohit', product_list('Laptop','Smartphone'));
+INSERT INTO customers_wishlist VALUES (2, 'Sneha', product_list('Headphones'));
+
+🔹 Step 4: Procedure to Insert / Delete / Update Wishlist
+
+CREATE OR REPLACE PROCEDURE manage_wishlist(
+    p_customer_id IN NUMBER,
+    p_action      IN VARCHAR2,
+    p_old_product IN VARCHAR2 DEFAULT NULL,
+    p_new_product IN VARCHAR2 DEFAULT NULL
+)
+IS
+BEGIN
+    IF p_action = 'INSERT' THEN
+        UPDATE customers_wishlist c
+        SET c.wishlist = c.wishlist MULTISET UNION product_list(p_new_product)
+        WHERE c.customer_id = p_customer_id;
+
+    ELSIF p_action = 'DELETE' THEN
+        UPDATE customers_wishlist c
+        SET c.wishlist = c.wishlist MULTISET EXCEPT product_list(p_old_product)
+        WHERE c.customer_id = p_customer_id;
+
+    ELSIF p_action = 'UPDATE' THEN
+        -- Remove old product
+        UPDATE customers_wishlist c
+        SET c.wishlist = c.wishlist MULTISET EXCEPT product_list(p_old_product)
+        WHERE c.customer_id = p_customer_id;
+
+        -- Add new product
+        UPDATE customers_wishlist c
+        SET c.wishlist = c.wishlist MULTISET UNION product_list(p_new_product)
+        WHERE c.customer_id = p_customer_id;
+    END IF;
+END;
+/
+
+
+------------------------
+-- Add a product to Rohit's wishlist
+EXEC manage_wishlist(1, 'INSERT', NULL, 'Smartwatch');
+
+-- Remove a product from Rohit's wishlist
+EXEC manage_wishlist(1, 'DELETE', 'Laptop');
+
+-- Update a product (replace Smartphone with Tablet)
+EXEC manage_wishlist(1, 'UPDATE', 'Smartphone', 'Tablet');
+
+
+--------------------
+Step 6: Query Wishlist
+SELECT c.customer_name, p.COLUMN_VALUE AS product
+FROM customers_wishlist c, TABLE(c.wishlist) p
+WHERE c.customer_id = 1;
+
+------------
+CUSTOMER_NAME  PRODUCT
+-------------  -------
+Rohit          Smartwatch
+Rohit          Tablet

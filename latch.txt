@@ -1,0 +1,239 @@
+select* from v$latch;
+
+
+cache buffers chains===	Protects access to buffer cache blocks
+library cache ===  Controls access to parsed SQL and PL/SQL code
+shared pool ===	Manages memory allocation in the shared pool
+redo allocation ==== Coordinates writing redo entries
+row cache objects === Protects data dictionary cache
+
+
+========================================
+
+select name FROM v$latch ORDER BY name;
+
+
+select gets,misses,name ,sleep from v$latch where name like '%lru%';
+select gets,misses,name ,sleep from v$latch where name like '%vir%';
+select gets,misses,name ,sleepfrom v$latch where name like '%redo%';
+select gets.misses,name,sleep from v$latch where name like '%chain%';
+
+
+SET PAGESIZE 100;
+SET LINESIZE 150;
+
+COLUMN gets   FORMAT 999999999999 HEADING 'GETS';
+COLUMN misses FORMAT 999999999999 HEADING 'MISSES';
+COLUMN name   FORMAT A40          HEADING 'LATCH NAME';
+
+SELECT gets, misses, name
+FROM   v$latch
+WHERE  name LIKE '%lru%';
+
+============================================
+
+SELECT name,
+       gets,
+       misses,
+       ROUND((misses / NULLIF(gets,0)) * 100, 2) AS "MISS PERCENT"
+FROM v$latch
+WHERE gets > 0
+ORDER BY misses DESC;
+
+
+
+
+____________________________________________________________________________
+
+COLUMN latch_name FORMAT A30
+COLUMN gets FORMAT 9999999
+COLUMN misses FORMAT 999999
+COLUMN sleeps FORMAT 999999
+COLUMN pct_miss FORMAT 999.99
+COLUMN pct_sleeps FORMAT 999.99
+
+SELECT
+   name AS latch_name,
+   gets,
+   misses,
+   ROUND((misses / DECODE(gets, 0, 1, gets)) * 100, 2) AS pct_miss,
+   sleeps,
+   ROUND((sleeps / DECODE(gets, 0, 1, gets)) * 100, 2) AS pct_sleeps
+FROM
+   v$latch
+WHERE
+   gets > 0
+ORDER BY
+   pct_miss DESC;
+
+
+
+
+-- Set display formatting
+SET PAGESIZE 100
+SET LINESIZE 150
+SET VERIFY OFF
+SET FEEDBACK ON
+SET TRIMSPOOL ON
+
+-- Format each column for better alignment
+COLUMN name        FORMAT A35       HEADING 'Latch Name'
+COLUMN gets        FORMAT 999,999,999 HEADING 'GETS'
+COLUMN misses      FORMAT 999,999,999 HEADING 'MISSES'
+COLUMN sleeps      FORMAT 999,999,999 HEADING 'SLEEPS'
+COLUMN miss_pct    FORMAT 999.99      HEADING 'MISS %'
+
+-- Example query (adjust to your view/table)
+SET PAGESIZE 100
+SET LINESIZE 150
+SET VERIFY OFF
+SET FEEDBACK ON
+SET TRIMSPOOL ON
+
+COLUMN name      FORMAT A35        HEADING 'Latch Name'
+COLUMN gets      FORMAT 999,999,999 HEADING 'GETS'
+COLUMN misses    FORMAT 999,999,999 HEADING 'MISSES'
+COLUMN sleeps    FORMAT 999,999,999 HEADING 'SLEEPS'
+COLUMN miss_pct  FORMAT 999.99      HEADING 'MISS %'
+
+SELECT
+    name,
+    gets,
+    misses,
+    sleeps,
+    ROUND((misses / DECODE(gets, 0, 1, gets)) * 100, 2) AS miss_pct
+FROM
+    v$latch
+WHERE
+    name IN ('redo allocation','cache buffers lru chain','redo copy','library cache')
+ORDER BY
+    miss_pct DESC;
+_____________________________________________________________________________________
+
+KRISHA:-
+--Latch
+SELECT
+    name,
+    gets,
+    misses,
+    immediate_gets,
+    immediate_misses
+FROM
+    v$latch
+WHERE
+    rownum <= 20;
+
+--cache lru chain
+redo allocation 
+library cache
+redo copy
+
+***************************************************************************************
+-- Formatting columns
+COLUMN name FORMAT A30
+COLUMN gets FORMAT 9999999
+COLUMN misses FORMAT 999999
+COLUMN immediate_gets FORMAT 999999
+COLUMN immediate_misses FORMAT 999999
+COLUMN miss_percent FORMAT 999.99
+COLUMN description FORMAT A50
+*******************************************************************************
+
+-- Query for top latches with description
+SELECT name,
+       gets,
+       misses,
+       ROUND((misses / DECODE(gets, 0, 1, gets)) * 100, 2) AS miss_ratio,
+       sleeps
+FROM v$latch
+WHERE name IN ('cache buffers lru chain', 
+               'redo allocation', 
+               'library cache', 
+               'redo copy');
+
+
+NAME                               GETS             MISSES    MISS_RATIO      SLEEPS
+------------------------------ --------------------- ------------- --------------------- ----------
+cache buffers lru chain         2649995        198         .01                         0
+redo copy                                      755            0           0                          0
+redo allocation                     ########   13690        .13                         0
+*****************************************************************************************
+
+--(a) Library Cache Latch Contention (caused by excessive parsing)
+ALTER SYSTEM FLUSH SHARED_POOL;
+ALTER SYSTEM FLUSH BUFFER_CACHE;
+
+SELECT * FROM student WHERE student_id = 1;
+SELECT * FROM student WHERE student_id = 2;
+SELECT * FROM student WHERE student_id = 3;
+
+SELECT name, value
+FROM v$sysstat
+WHERE name IN ('parse count (hard)', 'parse count (total)');
+
+NAME                                VALUE
+------------------------------      -----------------
+parse count (total)               6707891
+parse count (hard)                 120709            
+                                         -------------------
+     
+ANKESH:-
+----------------------------LIBRARY CACHE------------------------------
+SELECT
+    name,
+    gets,
+    misses,
+    sleeps,
+    ROUND(((gets - misses) / NULLIF(gets, 0)) * 100, 2) AS hit_ratio_percent
+FROM
+    v$latch
+WHERE
+    name LIKE 'library cache%';
+                                                   18%
+
+--reduce contention
+
+ALTER SYSTEM FLUSH SHARED_POOL;
+ALTER SYSTEM FLUSH BUFFER_CACHE;
+
+VARIABLE v_id NUMBER
+EXEC :v_id := 1;
+SELECT * FROM student WHERE student_id = :v_id;
+
+EXEC :v_id := 2;
+SELECT * FROM student WHERE student_id = :v_id;
+
+EXEC :v_id := 3;
+SELECT * FROM student WHERE student_id = :v_id;
+
+
+SELECT name, value
+FROM v$sysstat
+WHERE name IN ('parse count (hard)', 'parse count (total)');
+
+NAME                                VALUE
+------------------------------      -------------------
+parse count (total)               6716946
+parse count (hard)                 122276
+                                         --------------------
+                                                          2%
+
+*********************************************************************************
+
+--(b) Cache Buffers LRU Chain Latch Contention
+--Increase DB_CACHE_SIZE.
+
+-- Check current buffer cache size
+SHOW PARAMETER db_cache_size;
+
+-- Increase cache size 
+ALTER SYSTEM SET db_cache_size = 526M SCOPE=BOTH;
+
+********************************************************************************
+--(c) Redo Allocation & Redo Copy Latch Contention
+SELECT name, value
+FROM v$sysstat
+WHERE name LIKE 'redo%';
+
+--increase log buffer size:
+ALTER SYSTEM SET log_buffer = 33554432 SCOPE=SPFILE;

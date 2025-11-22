@@ -1,0 +1,35 @@
+
+Export the mca11 schema (excluding procedures manually):
+exp mca11/mca11@orcl file=mca11_backup_np.dmp log=mca11_backup_np.log
+
+
+Importing into the SCOTT Schema Using:
+imp mca11/mca11@orcl FILE=mca11_backup_np.dmp LOG=mca11_backup_np.log FROMUSER=mca11 TOUSER=mca11
+
+Loading Data from a Sequential File Using SQL*Loader:
+sqlldr mca11@orcl control=control.ctl 
+sqlldr mca11/mca11@orcl control=artist.ctl log=artist.log bad=artist.bad
+
+
+Exporting Data from the SCOTT Schema:
+exp mca11/mca11@orcl file=scott_export_np.dmp log=scott_export_np.log
+
+------------------------------------------------------------------------
+Practical-14
+------------
+- Export your schema without procedure and import into scott schema and load data from sequential file and dump into scott schema.
+
+Export the mca307 schema (excluding procedures manually):
+exp mca307/mca307@orcl9 file=mca333export.dmp log=mca333export.log  
+
+Importing into the SCOTT Schema Using:
+imp mca333/tae@orcl9 file=mca333export.dmp log=mca333import.log fromuser=mca307 touser=scott
+
+Loading Data from a Sequential File Using SQL*Loader:
+sqlldr mca307@orcl19 control=control.ctl 
+
+Exporting Data from the SCOTT Schema:
+exp mca333/tae@orcl9 file=scott_export.dmp log=scott_export.log
+
+
+    

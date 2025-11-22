@@ -1,0 +1,110 @@
+1.Full Database Export → FULL=Y (exports whole database).
+2.Tablespace Export → TABLESPACES=... (exports all objects in specific tablespaces).
+3.Schema Export → OWNER=... (exports all objects of a particular schema).
+4.Table Export → TABLES=... (exports only selected tables).
+
+
+FILES:-
+mca11_backup.dmp
+mca11_backup.log
+scott_backup.log
+
+
+
+*******Schema-Level Export:-
+synatx:--  exp username/password@service_name file=... log=... owner=...
+example:-  exp mcauser/mca11@orcl file=mca11_backup.dmp log=mca11_backup.log owner=mca11 rows=y indexes=y grants=y triggers=y constraints=y
+
+
+********Export specific tables :-
+exp mca11/mca11@orcl file=tbl_artist_mres.dmp  log=tbl_artist_mres.log tables=(artist,music_release) rows=y indexes=y grants=y triggers=y constraints=y	
+
+
+
+********Export schema excluding a specific object type :
+exp mca11/mca11@orcl file=obj_tbl.dmp log=obj_tbl.log owner=mca11 rows=y indexes=y  grants=n triggers=n constraints=n 
+
+
+********Export only the data :
+exp mca11/mca11@orcl file=o_data.dmp log=o_data.log owner=mca11 rows=y indexes=n grats=n trigger=n constranits=n
+
+**********Export schema including specific tables but without indexes:
+exp mca11/mca11@orcl file=no_idx.dmp log=no_idx.log tables=(artist,music_release) rows=y indexes=n grants=y triggers=y constraints=y	
+
+____________________________
+
+*******Import the schema :
+
+imp username/password@service_name file=dumpfile.dmp log=logfile.log fromuser=source_schema touser=target_schema
+imp mca11/mca11@orcl file=mca11_backup.dmp log=mca11_import.log fromuser=mca11 touser=mca11
+
+
+
+
+**********Import schema excluding a specific table :
+imp mca11/mca11@orcl file=tbl_artist_mres.dmp log=tbl_artist_mres.log fromuser=mca11 touser=mca11 tables=(artist,music_release) ignore=y
+
+
+*********Import specific tables :
+
+imp mca26@orcl file=mca11_schema.dmp log=mca26_import_tables.log fromuser=mca26 touser=mca26 tables=(DEPARTMENT,EMPLOYEE)
+
+**********Import data excluding constraints :
+imp mca11@orcl file=mca11_schema.dmp log=mca26_import_no_constraints.log fromuser=mca26 touser=mca26 constraints=n
+
+
+***********Import data overriding existing data:
+imp mca11@orcl file=mca11_schema.dmp log=mca11_import_full.log full=y
+
+
+
+-- inside SQL*Plus
+DROP TABLE table_name CASCADE CONSTRAINTS;
+DROP SEQUENCE sequence_name;
+DROP VIEW view_name;
+DROP PROCEDURE procedure_name;
+
+DROP USER mca11 CASCADE;
+
+
+
+++++++++++++MY ALL DROPS TABLES:-+++++++++++++++++++
+-- 1. Drop trigger(s)
+DROP TRIGGER status_change;
+
+-- 2. Drop views
+DROP VIEW view_approved;
+DROP VIEW view_disapproved;
+DROP VIEW view_moderate;
+
+-- 3. Drop procedures
+DROP PROCEDURE insert_music_release;
+DROP PROCEDURE approve_song;
+DROP PROCEDURE get_music_releases;
+
+-- 4. Drop functions
+DROP FUNCTION song_count;
+
+-- 5. Drop package & package body
+DROP PACKAGE music_pack;
+
+-- 6. Drop tables (with CASCADE CONSTRAINTS for FKs)
+DROP TABLE approved_partitioned CASCADE CONSTRAINTS;
+DROP TABLE approved CASCADE CONSTRAINTS;
+DROP TABLE disapproved CASCADE CONSTRAINTS;
+DROP TABLE music_release CASCADE CONSTRAINTS;
+DROP TABLE artist CASCADE CONSTRAINTS;
+
+-- 7. Drop cluster (must be empty before dropping)
+DROP CLUSTER artist_music_cluster INCLUDING TABLES CASCADE CONSTRAINTS;
+
+-- 8. Drop sequences
+DROP SEQUENCE usercode_seq;
+DROP SEQUENCE upc_seq;
+
+-- 9. Finally drop the user (if you want to remove entire schema)
+-- ⚠️ Only if logged in as SYSTEM/DBA:
+-- DROP USER mca11 CASCADE;
+
+
+imp mca11/mca11@orcl file=mca11_backup.dmp log=mca11_import.log fromuser=mca11 touser=mca11 ignore=y

@@ -1,0 +1,134 @@
+CREATE TABLE student (
+    student_id NUMBER PRIMARY KEY,
+    student_name VARCHAR2(50),
+    subject VARCHAR2(50),
+    marks NUMBER
+)
+TABLESPACE USERS
+STORAGE (
+    INITIAL 2K
+    NEXT 3K
+    PCTINCREASE 0
+    MINEXTENTS 1
+    MAXEXTENTS 3
+);
+
+INSERT INTO student VALUES (1, 'uru', 'math', 85);
+
+
+INSERT INTO student VALUES (2, 'hetu', 'ds', 78);
+INSERT INTO student VALUES (3, 'vishal', 'c', 92);
+INSERT INTO student VALUES (4, 'riddhi', 'os', 88);
+INSERT INTO student VALUES (5, 'siddhi', 'adbms', 75);
+INSERT INTO student VALUES (6, 'sanket', 'math', 86);
+INSERT INTO student VALUES (7, 'dhruvin', 'math', 87);
+INSERT INTO student VALUES (8, 'mahek', 'java', 56);
+INSERT INTO student VALUES (9, 'pooja', 'math', 98);
+INSERT INTO student VALUES (10, 'dhruvi', 'guj', 89);
+INSERT INTO student VALUES (11, 'drashti', 'eng', 90);
+INSERT INTO student VALUES (12, 'kishan', 'ss', 87);
+INSERT INTO student VALUES (13, 'dixa', 'python', 87);
+INSERT INTO student VALUES (14, 'krina', 'math', 88);
+INSERT INTO student VALUES (15, 'krisha', 'react', 82);
+
+COMMIT;
+
+SELECT student_name, marks
+FROM student
+WHERE subject = 'math' AND marks > 80;
+
+GENERATE EXECUTION PLAN::-
+
+EXPLAIN PLAN FOR
+SELECT student_name, marks
+FROM student
+WHERE subject = 'math' AND marks > 80;
+
+SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY);
+
+
+PLAN_TABLE_OUTPUT
+--------------------------------------------------------------------------------
+Plan hash value: 2356778634
+
+-----------------------------------------------------------------------------
+| Id  | Operation         | Name    | Rows  | Bytes | Cost (%CPU)| Time     |
+-----------------------------------------------------------------------------
+|   0 | SELECT STATEMENT  |         |     1 |    67 |     2   (0)| 00:00:01 |
+|*  1 |  TABLE ACCESS FULL| STUDENT |     1 |    67 |     2   (0)| 00:00:01 |
+-----------------------------------------------------------------------------
+
+Predicate Information (identified by operation id):
+---------------------------------------------------
+
+PLAN_TABLE_OUTPUT
+--------------------------------------------------------------------------------
+
+   1 - filter("SUBJECT"='math' AND "MARKS">80)
+____________________________________________________________________________________
+(((((((create index))))))))))
+
+CREATE INDEX idx_subject_marks ON student(subject, marks);
+OR:-
+
+
+EXPLAIN PLAN FOR
+SELECT student_name, marks
+FROM student
+WHERE subject = 'math' AND marks > 80;
+
+SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY);
+
+
+Plan hash value: 987654321
+
+--------------------------------------------------------------------
+| Id  | Operation                  | Name             | Rows | Cost |
+--------------------------------------------------------------------
+|   0 | SELECT STATEMENT           |                  |    3 |    2 |
+|*  1 |  TABLE ACCESS BY INDEX ROWID| STUDENT         |    3 |    2 |
+|   2 |   INDEX RANGE SCAN         | IDX_SUBJECT_MARKS|    3 |    1 |
+--------------------------------------------------------------------
+
+Predicate Information:
+----------------------
+   1 - filter("MARKS">80)
+   2 - access("SUBJECT"='math')
+___________________________________________________________________________________________________________
+jaydip
+__________________________________________________________________________________________________________
+Practical-6
+-----------
+- Write a query to find out what will be the execution plan of the query.
+- Derive all the steps.
+
+
+EXPLAIN PLAN 
+SET STATEMENT_ID = 'StudentData'
+FOR 
+SELECT * FROM student WHERE student_id > 5;
+
+SELECT id, 
+       statement_id,
+       plan_id,
+       operation,
+       options, 
+       object_name, 
+       object_alias, 
+       position,
+       parent_id,
+       cpu_cost,
+       io_cost
+FROM plan_table 
+START WITH id = 0 AND statement_id = 'StudentData' 
+CONNECT BY PRIOR id = parent_id 
+ORDER BY id;
+
+
+DELETE FROM plan_table;
+
+COLUMN position FORMAT A20
+COLUMN object_alias FORMAT A20
+COLUMN object_name FORMAT A20
+COLUMN options FORMAT A30
+COLUMN operation FORMAT A20

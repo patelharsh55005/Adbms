@@ -1,0 +1,410 @@
+cluster
+create tables
+insert
+views
+trigger
+procedure
+functions
+indexes
+packages
+SQL> SELECT tablespace_name FROM dba_tablespaces;
+****************************************************************************
+1.CREATE CLUSTER:-
+___________________
+
+create cluster artist_music_cluster(
+      artistname varchar2(30)
+)
+tablespace users 
+storage(
+	initial 5k
+        next 10K
+        minextents 1
+        maxextents 3
+  );
+                        
+*******************************************************************************
+2.CREATE TABLE
+_________________
+
+create table artist (
+    usercode number primary key,
+    username varchar2(20) not null,
+    email varchar2(30) not null unique,
+    password varchar2(30) not null,
+    artistname varchar2(30) not null unique
+) CLUSTER artist_music_cluster (artistname);
+
+Table created.
+
+SQL> desc artist;
+ Name                                      Null?    Type
+ ----------------------------------------- -------- ----------------------------
+ USERCODE                                  NOT NULL NUMBER
+ USERNAME                                  NOT NULL VARCHAR2(20)
+ EMAIL                                     NOT NULL VARCHAR2(30)
+ PASSWORD                                  NOT NULL VARCHAR2(30)
+ ARTISTNAME                                NOT NULL VARCHAR2(30)
+____________________________________________
+create table music_release (
+    upc number(12) primary key,
+    release_title varchar2(50) not null,
+    artist_id number not null,
+    artistname varchar2(30),
+    primary_genre varchar2(10),
+    composite_year varchar2(20),
+    composite_name varchar2(20),
+    release_date DATE,
+    track_file varchar2(200),
+    album_cover varchar2(200),
+    status varchar2(20) DEFAULT 'Moderate'
+        CHECK (status IN ('Moderate', 'Approved', 'Disapproved')),
+    foreign key (artist_id) references artist(usercode) ON DELETE CASCADE
+) CLUSTER artist_music_cluster(artistname);
+
+Table created.
+
+ Name                                      Null?    Type
+ ----------------------------------------- -------- ----------------------------
+ UPC                                       NOT NULL NUMBER(12)
+ RELEASE_TITLE                             NOT NULL VARCHAR2(50)
+ ARTIST_ID                                 NOT NULL NUMBER
+ ARTISTNAME                                         VARCHAR2(30)
+ PRIMARY_GENRE                                      VARCHAR2(10)
+ COMPOSITE_YEAR                                     VARCHAR2(20)
+ COMPOSITE_NAME                                     VARCHAR2(20)
+ RELEASE_DATE                                       DATE
+ TRACK_FILE                                         VARCHAR2(200)
+ ALBUM_COVER                                        VARCHAR2(200)
+ STATUS                                             VARCHAR2(20)
+
+_______________________________________________
+
+create table approved (
+    upc number(12) primary key,
+    approved_by varchar2(50),
+    approved_date DATE DEFAULT SYSDATE,
+    foreign key (upc) references music_release(upc) ON DELETE CASCADE
+);
+
+Table created.
+ Name                                      Null?    Type
+ ----------------------------------------- -------- ----------------------------
+ UPC                                       NOT NULL NUMBER(12)
+ APPROVED_BY                                        VARCHAR2(50)
+ APPROVED_DATE                                      DATE
+_____________________________________________
+create table disapproved (
+    upc NUMBER(12) primary key,
+    disapproved_by varchar2(50),
+    disapproved_date DATE DEFAULT SYSDATE,
+    reason varchar2(200),
+    foreign key (upc) references music_release(upc) ON DELETE CASCADE
+);
+
+Table created.
+
+ Name                                      Null?    Type
+ ----------------------------------------- -------- ----------------------------
+ UPC                                       NOT NULL NUMBER(12)
+ DISAPPROVED_BY                                     VARCHAR2(50)
+ DISAPPROVED_DATE                                   DATE
+ REASON                                             VARCHAR2(200)
+
+*****************************************************************************************
+3.CREATE SEQUENCE
+____________________
+create sequence usercode_seq start with 1 increment by 1 nocache;
+
+Sequence created.
+
+create sequence upc_seq start with 100000000001 increment by 1 nocache;
+
+
+Sequence created.
+
+********************************************************************************************
+4.CREATE  INDEX:-
+_________________
+create index artist_music_cluster_idx ON CLUSTER artist_music_cluster;( b tree index..)
+
+
+Index created.
+********************************************************************************************
+INSERT  RECORD:----
+
+
+insert into artist VALUES (usercode_seq.NEXTVAL, 'urvisha', 'urvi@gmail.com', 'pass123', 'URVI MUSIC');
+insert into artist VALUES (usercode_seq.NEXTVAL, 'yagnik', 'yagnik@gmail.com', 'pass456', 'YAGNIK MUSIC');
+insert into artist VALUES (usercode_seq.NEXTVAL, 'jay', 'jay@gmail.com', 'pass789', 'JAY MUSIC');
+insert into artist VALUES (usercode_seq.NEXTVAL, 'zeel', 'zeel@gmail.com', 'pass159', 'ZEEL MUSIC');
+
+1 row created.
+
+
+
+insert  into music_release VALUES (upc_seq.NEXTVAL,'Dream Song',1,'URVI MUSIC','Pop','2025','Urvi',TO_DATE('02-AUG-2025', 'DD-MON-YYYY'),'dream_song.mp3','dream_cover.jpg','Moderate');
+insert  into music_release VALUES (upc_seq.NEXTVAL,'lazy Song',1,'URVI MUSIC','Pop','2025','Urvi',TO_DATE('02-AUG-2025', 'DD-MON-YYYY'),'lazy_song.mp3','lazy_cover.jpg','Approved');
+insert  into music_release VALUES (upc_seq.NEXTVAL,'Nighty sky',1,'YAGNIK MUSIC','Electronic','2025','Yagnik',TO_DATE('12-MAY-2025', 'DD-MON-YYYY'),'Nighty_song.mp3','Nighty_cover.jpg','Approved');
+insert  into music_release VALUES (upc_seq.NEXTVAL,'Sunrise Bliss Song',1,'JAY MUSIC','Chill','2025','Jay',TO_DATE('19-AUG-2008', 'DD-MON-YYYY'),'Sunrise_song.mp3','Sunrise_cover.jpg','Disapproved');
+insert  into music_release VALUES (upc_seq.NEXTVAL,'Star Light Song',1,'ZEEL MUSIC','Fusion','2025','Zeel',TO_DATE('02-jun-2021', 'DD-MON-YYYY'),'Star_song.mp3','Star_cover.jpg','Moderate');
+insert  into music_release VALUES (123456789009,'Star Light Song',1,'ABC MUSIC','Fusion','2025','Zeel',TO_DATE('02-jun-2021', 'DD-MON-YYYY'),'Star_song.mp3','Star_cover.jpg','Moderate');
+
+
+
+CREATE OR REPLACE PROCEDURE insert_music_release (
+    p_upc            NUMBER,
+    p_release_title  VARCHAR2,
+    p_artist_id      NUMBER,
+    p_artistname     VARCHAR2,
+    p_primary_genre  VARCHAR2,
+    p_composite_year VARCHAR2,
+    p_composite_name VARCHAR2,
+    p_release_date   DATE,
+    p_track_file     VARCHAR2,
+    p_album_cover    VARCHAR2,
+    p_status         VARCHAR2
+)
+IS
+BEGIN
+    INSERT INTO music_release (
+        upc, release_title, artist_id, artistname,
+        primary_genre, composite_year, composite_name,
+        release_date, track_file, album_cover, status
+    )
+    VALUES (
+        p_upc, p_release_title, p_artist_id, p_artistname,
+        p_primary_genre, p_composite_year, p_composite_name,
+        p_release_date, p_track_file, p_album_cover, p_status
+    );
+END;
+/
+
+********************************************************************************************
+5.CREATE TRIGGER:----
+
+CREATE OR REPLACE TRIGGER status_change
+AFTER UPDATE OF status ON music_release
+FOR EACH ROW
+BEGIN
+    IF :NEW.status = 'Approved' THEN
+        BEGIN
+            INSERT INTO approved_partitioned (upc, artistname)
+            SELECT :NEW.upc, 'Admin'
+            FROM dual
+            WHERE NOT EXISTS (
+                SELECT 1 FROM approved_partitioned WHERE upc = :NEW.upc
+            );
+        END;
+    ELSIF :NEW.status = 'Disapproved' THEN
+        BEGIN
+            INSERT INTO disapproved (upc, disapproved_by, reason)
+            SELECT :NEW.upc, 'Admin', 'Auto-disapproval'
+            FROM dual
+            WHERE NOT EXISTS (
+                SELECT 1 FROM disapproved WHERE upc = :NEW.upc
+            );
+        END;
+    END IF;
+END;
+/
+
+
+
+Trigger created.
+
+
+
+
+************************************************************
+
+6.CREATE VIEW:-----------
+__________________________
+
+create or replace view view_approved as
+select  upc, release_title, artistname, release_date
+from music_release
+where status = 'Approved';
+
+create or replace view view_disapproved as
+select  upc, release_title, artistname, release_date
+from music_release
+where status = 'Disapproved'
+
+create or replace view view_moderate as
+select  upc, release_title, artistname, release_date
+from music_release
+where status = 'Moderate'
+
+
+View created.
+***********************************************************
+
+7.CREATE PROCEDURE:---
+_______________________
+
+create or replace procedure approve_song(p_upc number) is
+begin
+    update music_release
+    set status = 'Approved'
+    where upc = p_upc;
+end;
+/
+
+
+Procedure created.
+
+
+----------------------------------------------------------------------
+
+
+
+CREATE OR REPLACE PROCEDURE get_music_releases(p_cursor OUT SYS_REFCURSOR) 
+AS
+BEGIN
+    OPEN p_cursor FOR
+        SELECT upc, release_title, artistname, status, release_date
+        FROM music_release;
+END;
+/
+
+
+*************************************************************
+
+8.CREATE FUNCTION:--
+
+
+create or replace function song_count(p_artistname varchar2)
+return number is
+total number;
+ begin
+       select count(*) into total
+       from music_release
+       where trim(upper(artistname)) = trim(upper(p_artistname));
+       return total;
+ end;
+ /
+Function created.
+*********************************************
+OUTPUT:-----
+select * from music_release;
+select * from music_release WHERE status = 'Approved';
+select * from music_release WHERE status = 'Disapproved';
+select * from music_release WHERE status = 'Moderate';
+select * from view_approved;
+select * from view_disapproved;
+DESC approve_song;//procedure describe
+
+select table_name from user_tables;
+
+ecec approve_song(100000000002);
+SELECT song_count('URVI MUSIC') FROM dual;
+
+
+
+*********************************************************************
+ocedure created.
+
+SET LINESIZE 200
+SET PAGESIZE 100
+COLUMN release_title FORMAT A25
+COLUMN artistname FORMAT A20
+COLUMN composite_name FORMAT A20
+COLUMN track_file FORMAT A30
+COLUMN album_cover FORMAT A30
+COLUMN status FORMAT A15
+
+
+ COLUMN upc FORMAT 999999999999
+
+************************************************************************
+CREATE PACKAGE:-
+____________________
+create or replace package music_pack is
+	procedure approve_song(p_upc number);
+	function song_count(p_artistname varchar2) return number;
+end music_pack;
+/
+
+
+create or replace package body music_pack is
+	 procedure approve_song(p_upc number) is
+begin
+    update music_release
+    set status = 'Approved'
+    where upc = p_upc;
+end approve_song;
+ function song_count(p_artistname varchar2)
+return number is
+    total number;
+begin
+    select count(*) into total
+    from music_release
+    where artistname = p_artistname;
+    return total;
+end song_count;
+end music_pack; 
+/
+
+
+select music_pack.song_count('URVI MUSIC') from dual;
+
+ COLUMN upc FORMAT 999999999999
+___________________________________________________________________________________________
+PARTITION:---
+++++++partition approve table:-+++++++++++++++
+
+
+CREATE TABLE approved_partitioned
+(
+    upc           NUMBER,
+    title         VARCHAR2(100),
+    artistname    VARCHAR2(50),
+    approval_date DATE
+)
+PARTITION BY RANGE (approval_date)
+(
+    PARTITION p_old VALUES LESS THAN (DATE '2024-01-01')
+        STORAGE (INITIAL 5k NEXT 10k)
+        TABLESPACE stud,
+    PARTITION p_recent VALUES LESS THAN (DATE '2025-01-01')
+        STORAGE (INITIAL 5k NEXT 10k)
+        TABLESPACE student,
+    PARTITION p_new VALUES LESS THAN (MAXVALUE)
+        STORAGE (INITIAL 10k NEXT 15K)
+        TABLESPACE stud
+);
+
+
+INSERTED..
+________
+INSERT INTO approved_partitioned VALUES (101, 'Old Song', 'Arijit Singh', DATE '2023-12-15');
+INSERT INTO approved_partitioned VALUES (102, 'Recent Song', 'Shreya Ghoshal', DATE '2024-07-01');
+INSERT INTO approved_partitioned VALUES (103, 'New Song', 'Darshan Raval', DATE '2025-07-15');
+
+
+_______
+SELECT * FROM approved_partitioned PARTITION (p_old);
+
+SELECT * FROM approved_partitioned PARTITION (p_recent);
+
+SELECT * FROM approved_partitioned PARTITION (p_new);
+
+
+
+
+--------------------------------------------
+
+CREATE OR REPLACE PROCEDURE get_music_releases(p_cursor OUT SYS_REFCURSOR) 
+AS
+BEGIN
+    OPEN p_cursor FOR
+        SELECT upc, release_title, artistname, status, release_date
+        FROM music_release;
+END;
+/
+
+
+
+--------------------------------------------
+

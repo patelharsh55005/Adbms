@@ -1,0 +1,160 @@
+Shared pool hit ratio:-
+-----------------------
+Shared Pool Hit Ratio=(1−Total ParsesSession Cursor Cache Misses + Hard Parses​)×100
+Pins = number of times an object (SQL/PLSQL) was executed.
+PinHits = number of times Oracle found it already in cache.
+
+
+SELECT 
+    ROUND(
+        (SUM(pinhits) / NULLIF(SUM(pins), 0)) * 100, 
+        2
+    ) AS library_cache_hit_ratio
+FROM 
+    v$librarycache
+WHERE 
+    pins > 0;
+
+
+_______________
+
+
+redo log buffer:-
+redo entries → total redo records generated.
+redo buffer allocation retries → how many times Oracle had to wait for space in redo buffer.
+------------
+Redo Log Buffer Hit Ratio=(1−Redo EntriesRedo Buffer Allocation Retries)×100
+
+(a) Using redo log space requests vs redo entries
+
+SELECT
+    (1 - (r.value / e.value)) * 100 AS redo_log_hit_ratio
+FROM 
+    v$sysstat r, 
+    v$sysstat e
+WHERE  
+    r.name = 'redo log space requests'
+AND    
+    e.name = 'redo entries';
+--------------
+(b) Using redo wastage vs redo entries
+
+SELECT 
+    ROUND(
+        (1 - (r.value / NULLIF(e.value, 0))) * 100, 
+        2
+    ) AS redo_log_hit_ratio
+FROM 
+    v$sysstat r, 
+    v$sysstat e
+WHERE 
+    r.name = 'redo buffer allocation retries'
+    AND e.name = 'redo entries';
+--------------------
+
+(c) Using redo buffer allocation retries vs redo entries
+SELECT 
+    ROUND(
+        (1 - (r.value / NULLIF(e.value, 0))) * 100, 
+        2
+    ) AS redo_log_hit_ratio
+FROM 
+    v$sysstat r, 
+    v$sysstat e
+WHERE 
+    r.name = 'redo buffer allocation retries'
+    AND e.name = 'redo entries';
+_________________________
+🔹 Example (Imagine Numbers)
+
+Shared Pool:
+
+Pins = 1000
+
+Reloads = 50
+
+Hit Ratio = 1 - (50 / 1000) = 0.95 → 95% ✅ Good
+
+Redo Log:
+
+Redo entries = 200000
+
+Retries = 500
+
+Hit Ratio = (1 - (500 / 200000)) × 100 = 99.75% ✅ Excellent
+_______________________________________________________________________________________________________________________________
+1.shared pool (library cache ) hitratio
+ formula:-
+Hit Ratio=PINSPINS−RELOADS​
+SELECT (SUM(PINS - RELOADS)) / SUM(PINS) AS "Library Cache Hit Ratio"
+FROM V$LIBRARYCACHE;
+PINS → number of times an item (SQL statement or PL/SQL object) was executed.
+
+RELOADS → number of times an item was not found in cache and had to be reloaded.
+
+example:-
+SELECT 
+    ROUND((SUM(PINS - RELOADS) / SUM(PINS)) * 100, 2) AS "Shared Pool (Library Cache) Hit Ratio (%)"
+FROM V$LIBRARYCACHE;
+
+
+if required increase 
+
+increase SHARED_POOL_SIZE
+ALTER SYSTEM SET SHARED_POOL_SIZE = 300M SCOPE=BOTH;
+
+SQL> SHOW PARAMETER SHARED_POOL_SIZE;
+
+NAME                                 TYPE        VALUE
+------------------------------------ ----------- ------------------------------
+shared_pool_size                     big integer 320M
+SQL> ALTER SYSTEM SET SHARED_POOL_SIZE = 332M SCOPE=BOTH;
+
+System altered.
+
+SQL> SHOW PARAMETER SHARED_POOL_SIZE;
+
+NAME                                 TYPE        VALUE
+------------------------------------ ----------- ------------------------------
+shared_pool_size                     big integer 352M
+SQL>
+
+-------------------------------------------------------------------------------------------
+2.redo log buffer hit ratio:-
+Redo Log Allocation Hit Ratio=(1−Redo EntriesRedo Log Space Requests​)×100
+Redo Log Allocation Hit Ratio = (1 - (Redo Log Space Requests / Redo Entries)) * 100
+
+Redo Log Space Requests → number of times a user process had to wait because redo log buffer was full.
+
+Redo Entries → total number of redo entries generated.
+
+SELECT 
+    ROUND((1 - (a.value / b.value)) * 100, 2) AS "Redo Log Buffer Hit Ratio (%)"
+FROM V$SYSSTAT a, V$SYSSTAT b
+WHERE a.name = 'redo log space requests'
+  AND b.name = 'redo entries';
+
+SQL> SHOW PARAMETER log_buffer;
+
+NAME                                 TYPE        VALUE
+------------------------------------ ----------- ------------------------------
+log_buffer                           big integer 19536K
+
+ALTER SYSTEM SET LOG_BUFFER = 64M SCOPE=SPFILE;
+
+INSERT /*+ APPEND */ INTO big_table NOLOGGING
+SELECT * FROM source_table;
+
+_______
+_______
+
+after both check :-
+SELECT ROUND((SUM(PINS - RELOADS)/SUM(PINS))*100,2) AS "Library Cache Hit Ratio"
+FROM V$LIBRARYCACHE;
+
+SELECT ROUND((1-(a.value/b.value))*100,2) AS "Redo Log Buffer Hit Ratio"
+FROM V$SYSSTAT a, V$SYSSTAT b
+WHERE a.name='redo log space requests'
+AND b.name='redo entries';
+
+

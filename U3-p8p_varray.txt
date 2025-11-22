@@ -1,0 +1,227 @@
+Step 1: Create Object & VARRAY Type
+-- Each account has account_no and balance
+CREATE OR REPLACE TYPE account_obj AS OBJECT (
+    account_no NUMBER,
+    balance    NUMBER
+);
+
+-- VARRAY of max 5 accounts per customer
+CREATE OR REPLACE TYPE account_varray IS VARRAY(5) OF account_obj;
+------------
+Step 2: Create Table with VARRAY
+
+CREATE TABLE customer_accounts (
+    cust_id   NUMBER PRIMARY KEY,
+    cust_name VARCHAR2(100),
+    accounts  account_varray
+);
+
+------------------
+Step 3: Insert Sample Data
+INSERT INTO customer_accounts VALUES
+(1, 'Ramesh', account_varray(account_obj(101, 5000), account_obj(102, 12000)));
+
+INSERT INTO customer_accounts VALUES
+(2, 'Suresh', account_varray(account_obj(201, 8000)));
+
+COMMIT;
+
+----------------------------
+Step 4: Create Procedure (Insert / Update / Delete)
+
+CREATE OR REPLACE PROCEDURE manage_accounts_varray(
+    p_cust_id   IN NUMBER,
+    p_action    IN VARCHAR2,
+    p_position  IN NUMBER DEFAULT NULL,   -- position in array (for update/delete)
+    p_acct_no   IN NUMBER DEFAULT NULL,
+    p_balance   IN NUMBER DEFAULT NULL
+) IS
+    v_accounts account_varray;
+BEGIN
+    -- Fetch varray for given customer
+    SELECT accounts INTO v_accounts
+    FROM customer_accounts
+    WHERE cust_id = p_cust_id
+    FOR UPDATE;
+
+    -- Insert New Account
+    IF p_action = 'INSERT' THEN
+        v_accounts.EXTEND;
+        v_accounts(v_accounts.LAST) := account_obj(p_acct_no, p_balance);
+
+    -- Update existing Account
+    ELSIF p_action = 'UPDATE' THEN
+        v_accounts(p_position) := account_obj(p_acct_no, p_balance);
+
+    -- Delete an account from position
+    ELSIF p_action = 'DELETE' THEN
+        FOR i IN p_position .. v_accounts.COUNT-1 LOOP
+            v_accounts(i) := v_accounts(i+1);
+        END LOOP;
+        v_accounts.TRIM;
+    END IF;
+
+    -- Save back
+    UPDATE customer_accounts
+    SET accounts = v_accounts
+    WHERE cust_id = p_cust_id;
+
+    COMMIT;
+END;
+/
+-------------------------
+Step 5: Test the Procedure
+-- Insert new account for Ramesh
+EXEC manage_accounts_varray(1, 'INSERT', NULL, 103, 15000);
+
+-- Update 2nd account
+EXEC manage_accounts_varray(1, 'UPDATE',  , 102, 20000);
+
+-- Delete 1st account of Ramesh
+EXEC manage_accounts_varray(1, 'DELETE', 1);
+
+
+
+
+
+
+
+
+_________________________________________________________________________
+
+PREPARATION FOR VARRAY:-
+3. 🔹 How to create a VARRAY type
+CREATE OR REPLACE TYPE samplevarray AS VARRAY(5) OF VARCHAR2(20);
+/
+
+-------------------------------
+4. 🔹 How to use VARRAY inside PL/SQL
+DECLARE
+   myvarray samplevarray := samplevarray('uru','hetu','vishal');
+BEGIN
+   DBMS_OUTPUT.PUT_LINE('First element: ' || myvarray(1));
+   DBMS_OUTPUT.PUT_LINE('Second element: ' || myvarray(2));
+   DBMS_OUTPUT.PUT_LINE('Third element: ' || myvarray(3));
+END;
+/
+
+First element: uru
+Second element: hetu
+Third element: vishal
+
+
+--------------------------------------------------------------------
+(b) Loop through all elements
+
+DECLARE
+   myvarray samplevarray := samplevarray('uru','hetu','vishal');
+BEGIN
+   FOR i IN 1..myvarray.COUNT LOOP
+      DBMS_OUTPUT.PUT_LINE('Element ' || i || ': ' || myvarray(i));
+   END LOOP;
+END;
+/
+
+Element 1: uru
+Element 2: hetu
+Element 3: vishal
+-------------------------------------------------------------
+(c) Delete an element (not directly supported ❌)
+
+DECLARE
+   myvarray samplevarray := samplevarray('uru','hetu','vishal');
+BEGIN
+   -- To "remove" element 2, we create a new varray
+   myvarray := samplevarray(myvarray(1), myvarray(3));
+   FOR i IN 1..myvarray.COUNT LOOP
+      DBMS_OUTPUT.PUT_LINE('Element ' || i || ': ' || myvarray(i));
+   END LOOP;
+END;
+/
+
+Element 1: uru
+Element 2: vishal
+
+-------------------------------------------------------------
+(d) Extend VARRAY
+
+DECLARE
+   myvarray samplevarray := samplevarray('uru','hetu','vishal');
+BEGIN
+   myvarray.EXTEND;  -- Increase by 1
+   myvarray(4) := 'drashti';
+   FOR i IN 1..myvarray.COUNT LOOP
+      DBMS_OUTPUT.PUT_LINE('Element ' || i || ': ' || myvarray(i));
+   END LOOP;
+END;
+/
+
+Element 1: uru
+Element 2: hetu
+Element 3: vishal
+Element 4: drashtI
+-------------------------------------------------------
+5. 🔹 Where to use VARRAY properly
+
+Small, bounded collections where order matters.
+
+Example use cases:
+
+Storing fixed no. of phone numbers for a person.
+
+Storing marks of 5 subjects for a student.
+
+Storing top 3 customers of a salesperson.
+
+
+-----------------------------------------------------
+----------------------------------------------------
+✅ Step 1: Create VARRAY type
+create or replace type samplevarray as varray(5) of varchar(20);
+
+✅ Step 2: Create Procedure for VARRAY operations
+
+create or replace procedure manage_varray(
+	p_action in varray2,
+	p_index in number default null,
+	p_value in varchar2 default null
+) as
+	myvarray samplevarray := samplevarray ('uru','hetu','vishal');
+begin
+	DBMS_OUTPUT.PUT_LINE('beore operation');
+	for i in 1..myvarray.count loop
+		dbms_output.put_line('element ' || i || ':' ||myvarray(i));
+	end loop;
+	
+	if upper(p_action)='UPDATE' then
+		if p_index between 1 and myarray.count then
+			myvarray(p_index) := p_value;
+			dbms_output.put_line('update index ' || p_index || 			'with' p_value);
+	else
+ 		dbms_output.put_line('error:invalid index for update');
+		end if;
+	end if;
+	
+	if upper(p_action)='delete' then
+		if p_index between 1 and myvarray.count then
+			myvarray := case p_index
+				when 1 then samplevarray(myvarray(2), 					myvarray(3))
+				when 2 then samplevarray(myvarray(1), 					myvarray(3))
+				when 3 then samplevarray(myvarray(2), 					myvarray(3))
+			end;
+			dbms_output.put_line('deleted element at index '|| 			p_index);
+		else
+			dbms_output.put_line('error invalid index for 				delete!');
+		end if;
+	ens if;
+	dbms_output.put_line('after operation');
+	for i in 1..myvarray.count loop
+		dbms_output.put_line('element' || i|| ' : ' ||myvarray(i));
+	end loop;
+end;
+/
+		
+	
+	
+
+

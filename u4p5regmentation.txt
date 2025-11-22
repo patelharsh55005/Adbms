@@ -1,0 +1,100 @@
+Practical-15
+------------
+- Find out database fragmentation, show fragmentation by more than one method and give minimum three solutions to resolve it. 
+
+create table for generate fregmentaion:-
+CREATE TABLE emp_frag (
+    emp_id     NUMBER PRIMARY KEY,
+    emp_name   VARCHAR2(50),
+    emp_addr   VARCHAR2(4000)
+)
+TABLESPACE USERS
+STORAGE (
+    INITIAL 64K
+    NEXT 64K
+    PCTINCREASE 0
+);
+
+insert a small rows:-------
+INSERT INTO emp_frag VALUES (1, 'Ankesh', 'Delhi');
+INSERT INTO emp_frag VALUES (2, 'Ram', 'Mumbai');
+INSERT INTO emp_frag VALUES (3, 'Sita', 'Pune');
+INSERT INTO emp_frag VALUES (4, 'Jayesh', 'Chennai');
+COMMIT;
+
+Update rows with large data (to force chaining/migration):-----
+UPDATE emp_frag SET emp_addr = RPAD('X', 2900, 'X') WHERE emp_id = 1;
+UPDATE emp_frag SET emp_addr = RPAD('Y', 2900, 'Y') WHERE emp_id = 2;
+UPDATE emp_frag SET emp_addr = RPAD('Z', 2900, 'Z') WHERE emp_id = 3;
+COMMIT;
+
+METHOD–1: Detect Fragmentation Using CHAINED_ROWS:-------
+
+@?/rdbms/admin/utlchain.sql
+
+ANALYZE TABLE emp_frag LIST CHAINED ROWS INTO chained_rows;
+Check fragmented rows:-----
+SELECT owner_name, table_name, head_rowid 
+FROM chained_rows 
+WHERE table_name = 'EMP_FRAG';
+
+
+🔍 METHOD–2: Detect Fragmentation Using DBMS_SPACE
+DECLARE
+  total_blocks NUMBER;
+  total_bytes NUMBER;
+  unused_blocks NUMBER;
+  unused_bytes NUMBER;
+  lastextf NUMBER;
+  last_extb NUMBER;
+  lastusedblock NUMBER;
+BEGIN
+   DBMS_SPACE.UNUSED_SPACE(
+      segment_owner      => USER,
+      segment_name       => 'EMP_FRAG',
+      segment_type       => 'TABLE',
+      total_blocks       => total_blocks,
+      total_bytes        => total_bytes,
+      unused_blocks      => unused_blocks,
+      unused_bytes       => unused_bytes,
+      last_used_extent_file_id => lastextf,
+      last_used_extent_block_id => last_extb,
+      last_used_block    => lastusedblock
+   );
+
+   DBMS_OUTPUT.PUT_LINE('Unused Bytes = ' || unused_bytes);
+   DBMS_OUTPUT.PUT_LINE('Unused Blocks = ' || unused_blocks);
+END;
+/
+
+METHOD–3: Detect Fragmentation Using USER_TABLES / DBA_TABLES
+SELECT table_name, blocks, empty_blocks, avg_row_len
+FROM user_tables
+WHERE table_name = 'EMP_FRAG'
+----------------------------------------------for remove fregmentation----------------
+
+🛠 REMOVE FRAGMENTATION (Method-1 Solution):-
+CREATE TABLE emp_frag_dummy AS SELECT * FROM emp_frag WHERE 1=0;
+
+
+INSERT INTO emp_frag_dummy
+SELECT *
+FROM emp_frag
+WHERE ROWID IN (SELECT head_rowid FROM chained_rows WHERE table_name='EMP_FRAG');
+
+
+DELETE FROM emp_frag
+WHERE ROWID IN (SELECT head_rowid FROM chained_rows WHERE table_name='EMP_FRAG');
+
+
+INSERT INTO emp_frag
+SELECT * FROM emp_frag_dummy;
+-------
+Solution–2: ALTER TABLE MOVE
+ALTER TABLE emp_frag MOVE;
+
+TRUNCATE TABLE chained_rows;
+
+Solution–4: Increase PCTFREE:--
+
+ALTER TABLE emp_frag PCTFREE 20;

@@ -1,0 +1,110 @@
+Lock Type = Row-level Exclusive Lock (TX) + Table-level TM lock.
+SET LINESIZE 200
+SET PAGESIZE 100
+SET WRAP OFF
+
+
+session A
+SELECT * FROM artist WHERE usercode = 1 FOR UPDATE;
+
+
+  USERCODE USERNAME             EMAIL
+---------- -------------------- ------------------------------
+PASSWORD                       ARTISTNAME
+------------------------------ ------------------------------
+         1 urvisha              urvi@gmail.com
+pass123                        URVI MUSIC
+
+______________________________________________________
+
+
+session B
+SELECT * FROM artist WHERE usercode = 1 FOR UPDATE;
+
+
+SELECT 
+    s.sid AS "Session ID",
+    s.serial# AS "Serial Number",
+    s.username AS "DB User",
+    o.object_name AS "Locked Table",
+    l.type AS "Lock Type",
+    l.id1 AS "Object ID",
+    l.id2 AS "Sub Object",
+    l.lmode AS "Held Lock",
+    l.request AS "Req Lock",
+    DECODE(l.lmode,
+        0, 'None',
+        1, 'Null',
+        2, 'Row-S (SS)',
+        3, 'Row-X (SX)',
+        4, 'Share',
+        5, 'S/Row-X (SSX)',
+        6, 'Exclusive') AS "Held Mode",
+    DECODE(l.request,
+        0, 'None',
+        1, 'Null',
+        2, 'Row-S (SS)',
+        3, 'Row-X (SX)',
+        4, 'Share',
+        5, 'S/Row-X (SSX)',
+        6, 'Exclusive') AS "Requested Mode"
+FROM 
+    v$session s
+JOIN 
+    v$lock l ON s.sid = l.sid
+JOIN 
+    dba_objects o ON l.id1 = o.object_id
+WHERE 
+    o.object_name = 'ARTIST'
+    AND l.type IN ('TX','TM');
+
+
+
+
+
+
+COLUMN "Session ID"         FORMAT 999999      HEADING 'Session|ID'
+COLUMN "Serial Number"      FORMAT 999999      HEADING 'Serial|Number'
+COLUMN "DB User"            FORMAT A12         HEADING 'DB|User'
+COLUMN "Locked Table"       FORMAT A15         HEADING 'Locked|Table'
+COLUMN "Lock Type"          FORMAT A4          HEADING 'Lock|Type'
+COLUMN "Object ID"          FORMAT 999999      HEADING 'Object|ID'
+COLUMN "Sub Object"         FORMAT 999999      HEADING 'Sub|Object'
+COLUMN "Held Lock"          FORMAT 999         HEADING 'Held|Lock'
+COLUMN "Req Lock"           FORMAT 999         HEADING 'Req|Lock'
+COLUMN "Held Mode"          FORMAT A12         HEADING 'Held Mode'
+COLUMN "Requested Mode"     FORMAT A12         HEADING 'Requested|Mode'
+
+
+session A 
+
+COMMIT;
+
+
+Session  Serial DB           Locked          Lock  Object     Sub Held  Req              Requested
+     ID  Number User         Table           Type      ID  Object Lock Lock Held Mode    Mode
+------- ------- ------------ --------------- ---- ------- ------- ---- ---- ------------ ------------
+    137   44238 MCA11        ARTIST          TM    275199       0    3    0 Row-X (SX)   None
+
+NOTES:-
+______
+Lock Type
+0 = None
+1 = Null
+2 = Row-S (SS)  → Shared Sub
+3 = Row-X (SX)  → Sub Exclusive
+4 = Share       → Share lock
+5 = S/Row-X (SSX) → Share+Row Exclusive
+6 = Exclusive   → Exclusive lock
+
+
+TX = Transaction lock (row-level).
+
+TM = DML lock (table-level).
+
+Lock Held (LMODE) → Which lock session is holding.
+
+Lock Requested → Which lock another session is waiting for.
+
+Held Mode Desc / Requested Mode Desc → Easy-to-read lock mode (Row-X, Share, etc.).
+						

@@ -1,0 +1,141 @@
+DBMS_DDL.ANALYZE_OBJECT is used to collect statistics for:
+TABLE
+INDEX
+CLUSTER
+Statistics include:
+number of rows
+number of blocks
+empty blocks
+average row length
+These statistics help Oracle optimize execution plans.
+Mode	Meaning
+COMPUTE	Scan whole table – most accurate
+ESTIMATE	Scan sample rows – faster but less accurate
+
+_____________________________
+create cluster artist_music_cluster(
+      artistname varchar2(30)
+)
+tablespace users 
+storage(
+	initial 5k
+        next 10K
+        minextents 1
+        maxextents 3
+  );
+     
+_
+create table artist (
+    usercode number primary key,
+    username varchar2(20) not null,
+    email varchar2(30) not null unique,
+    password varchar2(30) not null,
+    artistname varchar2(30) not null unique
+) CLUSTER artist_music_cluster (artistname);
+
+create index artist_music_cluster_idx ON CLUSTER artist_music_cluster;( b tree index..)
+__________________________________
+
+-- Analyze the table EMPLOYEE
+SET SERVEROUTPUT ON;
+
+BEGIN
+    DBMS_DDL.ANALYZE_OBJECT('TABLE', USER, 'ARTIST', 'COMPUTE'); 
+    DBMS_OUTPUT.PUT_LINE('Analysis complete for table EMPLOYEE');
+END;
+/
+
+-- Analyze all tables, indexes, and clusters automatically
+SET SERVEROUTPUT ON;
+
+BEGIN
+    FOR rec IN (
+        SELECT object_name, object_type
+        FROM user_objects
+        WHERE object_type IN ('TABLE','INDEX','CLUSTER')
+    ) LOOP
+        BEGIN
+            DBMS_DDL.ANALYZE_OBJECT(rec.object_type, USER, rec.object_name, 'COMPUTE');
+            DBMS_OUTPUT.PUT_LINE('Analyzed: ' || rec.object_type || ' ' || rec.object_name);
+        EXCEPTION
+            WHEN OTHERS THEN
+                DBMS_OUTPUT.PUT_LINE('Failed: ' || rec.object_type || ' ' || rec.object_name || ' - ' || SQLERRM);
+        END;
+    END LOOP;
+END;
+/
+
+
+Analyzed: TABLE ACCOUNTS
+Analyzed: TABLE APPROVED_PARTITIONED
+Analyzed: TABLE ARTIST
+Analyzed: CLUSTER ARTIST_MUSIC_CLUSTER
+Analyzed: INDEX ARTIST_MUSIC_CLUSTER_IDX
+Analyzed: TABLE ATTENDANCE
+Analyzed: TABLE CHAINED_ROWS
+Analyzed: TABLE CUSTMER_ACC
+Analyzed: TABLE CUSTOMER
+Analyzed: TABLE CUSTOMER_ACC
+Analyzed: TABLE DEMO
+Analyzed: TABLE DEMO1
+Analyzed: TABLE DEPARTMENT
+Analyzed: TABLE DISAPPROVED
+Analyzed: TABLE EMP
+Analyzed: TABLE EMPLOYEE
+Analyzed: TABLE EMPLOYEE_INFO
+Analyzed: CLUSTER EMP_ATT_CLUSTER
+Analyzed: INDEX EMP_ATT_CLUSTER_IND
+Analyzed: TABLE EMP_INFF
+Analyzed: TABLE EMP_INFO
+Analyzed: INDEX IDX_EMP_NAME
+Analyzed: INDEX IDX_PAYROLL_MY
+Analyzed: INDEX IDX_TXN_ACCT
+Analyzed: INDEX IDX_TXN_DATE
+Analyzed: TABLE MUSIC_RELEASE
+Analyzed: TABLE MYSTUDENTS
+Analyzed: TABLE MYSTUDENTS_DUMMY
+Analyzed: TABLE ORDERS_TAB
+Analyzed: TABLE PAYROLL
+Analyzed: TABLE STUDENT
+Analyzed: INDEX SYS_C0022682
+Analyzed: INDEX SYS_C0022683
+Analyzed: INDEX SYS_C0022684
+Analyzed: INDEX SYS_C0022685
+Analyzed: INDEX SYS_C0022689
+Analyzed: INDEX SYS_C0022842
+Analyzed: INDEX SYS_C0022843
+Analyzed: INDEX SYS_C0022884
+Analyzed: INDEX SYS_C0022885
+Analyzed: INDEX SYS_C0022985
+Analyzed: INDEX SYS_C0023235
+Analyzed: INDEX SYS_C0023236
+Analyzed: INDEX SYS_C0023358
+Analyzed: INDEX SYS_C0023359
+Analyzed: INDEX SYS_C0023655
+Analyzed: INDEX SYS_C0023656
+Analyzed: INDEX SYS_C0024096
+Analyzed: INDEX SYS_C0024122
+Analyzed: INDEX SYS_C0024147
+Analyzed: INDEX SYS_FK0000276893N00003$
+Analyzed: TABLE TRANSACTIONS
+Analyzed: TABLE TRANSACTIONS_PART
+
+6:17 PM 10/9/2025
+-- Check detailed statistics of ARTIST and DEMO,DEPARTEMENT
+SELECT table_name, num_rows, blocks, empty_blocks, avg_row_len, last_analyzed
+FROM dba_tab_statistics
+WHERE owner = USER
+  AND table_name IN ('ARTIST','DEMO','DEPARTMENT');
+
+
+-- Check basic info for ARTIST
+SELECT table_name, num_rows, blocks, empty_blocks
+FROM dba_tables
+WHERE owner = USER
+  AND table_name = 'ARTIST'; 
+
+-- Check basic info for DEPARTMENT
+SELECT table_name, num_rows, blocks, empty_blocks
+FROM dba_tables
+WHERE owner = USER
+  AND table_name = 'DEPARTMENT';
